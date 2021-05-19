@@ -246,7 +246,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   double coeff_bits = 0;
   double tr_tree_bits = 0;
 
-  // Check that lcu is not in 
+  // Check that lcu is not in
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
@@ -499,6 +499,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (x + cu_width <= frame->width &&
       y + cu_width <= frame->height)
   {
+#if LOW_DELAY!=1
+
     int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
     bool can_use_inter =
       state->frame->slicetype != KVZ_SLICE_I &&
@@ -555,6 +557,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
     }
 
+#endif // LOW_DELAY!=1
+
     // Try to skip intra search in rd==0 mode.
     // This can be quite severe on bdrate. It might be better to do this
     // decision after reconstructing the inter frame.
@@ -584,6 +588,29 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->intra.mode = intra_mode;
       }
     }
+
+#if LOW_DELAY==1
+
+    if (cur_cu->type == CU_INTRA) {
+      assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
+      cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+      if (!(x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400)) {
+        kvz_intra_recon_cu(state,
+          x, y,
+          depth,
+          cur_cu->intra.mode, -1, // skip chroma
+          NULL, lcu);
+      } else {
+        kvz_intra_recon_cu(state,
+          x, y,
+          depth,
+          cur_cu->intra.mode, cur_cu->intra.mode_chroma,
+          NULL, lcu);
+      }
+    }
+
+#else
 
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
@@ -654,7 +681,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       lcu_fill_inter(lcu, x_local, y_local, cu_width);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     }
+
+#endif // LOW_DELAY==1
+
   }
+
+#if LOW_DELAY!=1
 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
@@ -694,6 +726,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     }
   }
 
+#endif //LOW_DELAY!=1
+
+#if LOW_DELAY!=1
+
   bool can_split_cu =
     // If the CU is partially outside the frame, we need to split it even
     // if pu_depth_intra and pu_depth_inter would not permit it.
@@ -701,6 +737,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     depth < pu_depth_intra.max ||
     (state->frame->slicetype != KVZ_SLICE_I &&
       depth < pu_depth_inter.max);
+
+#else
+
+  bool can_split_cu = cur_cu->type == CU_NOTSET ||
+    depth < ctrl->cfg.pu_depth_intra.max;
+
+#endif //LOW_DELAY!=1
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
@@ -736,6 +779,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     } else {
       split_cost = INT_MAX;
     }
+
+#if LOW_DELAY!=1
 
     // If no search is not performed for this depth, try just the best mode
     // of the top left CU from the next depth. This should ensure that 64x64
@@ -781,6 +826,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
     }
 
+#endif //LOW_DELAY!=1
+
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
@@ -816,7 +863,7 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
   const videoframe_t * const frame = state->tile->frame;
 
   FILL(*lcu, 0);
-  
+
   lcu->rec.chroma_format = state->encoder_control->chroma_format;
   lcu->ref.chroma_format = state->encoder_control->chroma_format;
 
@@ -958,8 +1005,8 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
     work_tree[depth] = work_tree[0];
   }
 
-  // If the ML depth prediction is enabled, 
-  // generate the depth prediction interval 
+  // If the ML depth prediction is enabled,
+  // generate the depth prediction interval
   // for the current lcu
   constraint_t* constr = state->constraint;
   if (constr->ml_intra_depth_ctu) {

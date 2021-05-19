@@ -59,6 +59,7 @@ void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
                       const bool print_psnr,
-                      const double avg_qp);
+                      const double avg_qp,
+                      const int64_t frame_time);
 
 #endif

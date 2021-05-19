@@ -55,16 +55,16 @@
  *
  * \defgroup CABAC
  * Context Adaptive Binary Arithmetic Encoder implementation
- * 
+ *
  * \defgroup Compression
  * Prediction parameter decisions and ratedistortion optimization
  *
  * \defgroup Control
  * Initialization and control flow of the encoder
- * 
+ *
  * \defgroup DataStructures
  * Containers for images, predictions parameters and such
- * 
+ *
  * \defgroup Extras
  * 3rd party modules not considered part of the encoder.
  *
@@ -103,6 +103,11 @@ typedef int16_t coeff_t;
 /* CONFIG VARIABLES */
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
+
+//! Low delay configuration
+#define LOW_DELAY 1
+// When enabled, recommended parameters:
+// --preset=ultrafast --no-psnr --pu-intra-depth 1-1 -p 1 --no-sao --no-deblock --rd 0 --owf 0 --tiles <int>x<int>
 
 //! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
 #define PU_DEPTH_INTER_MIN 0
@@ -203,7 +208,7 @@ typedef int16_t coeff_t;
 #define QUOTE(x) #x
 #define QUOTE_EXPAND(x) QUOTE(x)
 
-// NOTE: When making a release, check to see if incrementing libversion in 
+// NOTE: When making a release, check to see if incrementing libversion in
 // configure.ac is necessary.
 #ifndef KVZ_VERSION
 #define KVZ_VERSION 2.0.0

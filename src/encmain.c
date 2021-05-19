@@ -332,6 +332,12 @@ int main(int argc, char *argv[])
   clock_t encoding_end_cpu_time;
   KVZ_CLOCK_T encoding_end_real_time;
 
+  clock_t frame_times[20];
+  uint8_t timer_last_index = 0;
+  uint64_t min_frame_time = MAX_INT64;
+  uint64_t max_frame_time = 0;
+  uint64_t sum_frame_times = 0;
+
   // PTS of the reconstructed picture that should be output next.
   // Only used with --debug.
   uint64_t next_recon_pts = 0;
@@ -477,7 +483,7 @@ int main(int argc, char *argv[])
       assert(0);
       return 0;
     }
-    kvz_picture *cur_in_img;
+    kvz_picture *cur_in_img = NULL;
     for (;;) {
 
       // Skip mutex locking if the input thread does not exist.
@@ -505,6 +511,19 @@ int main(int argc, char *argv[])
       kvz_picture *img_src = NULL;
       uint32_t len_out = 0;
       kvz_frame_info info_out;
+#ifdef _WIN32
+      frame_times[timer_last_index] = clock();
+#else
+      struct timespec cur_time;
+      int ret = clock_gettime(CLOCK_REALTIME, &cur_time);
+      if (ret) {
+        fprintf(stderr, "Error getting time\n");
+        goto exit_failure;
+      }
+      frame_times[timer_last_index] = cur_time.tv_nsec;
+#endif
+      timer_last_index++;
+
       if (!api->encoder_encode(enc,
                                cur_in_img,
                                &chunks_out,
@@ -540,7 +559,7 @@ int main(int argc, char *argv[])
         fflush(output);
 
         bitstream_length += len_out;
-        
+
         // the level's bitrate check
         frames_this_second += 1;
 
@@ -609,8 +628,26 @@ int main(int argc, char *argv[])
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
+#ifdef _WIN32
+        int64_t frame_time = clock() - frame_times[0];
+#else
+        int ret = clock_gettime(CLOCK_REALTIME, &cur_time);
+        if (ret) {
+          fprintf(stderr, "Error getting time\n");
+          goto exit_failure;
+        }
+        int64_t frame_time = cur_time.tv_nsec - frame_times[0];
+#endif
+        for (int i = 0; i < timer_last_index - 1; i++) {
+          frame_times[i] = frame_times[i + 1];
+        }
+        timer_last_index--;
+        if (frame_time > max_frame_time) max_frame_time = frame_time;
+        if (frame_time < min_frame_time) min_frame_time = frame_time;
+        sum_frame_times += frame_time;
+
         print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr,
-                         calc_avg_qp(qp_sum, frames_done));
+                         calc_avg_qp(qp_sum, frames_done), frame_time);
       }
 
       api->picture_free(cur_in_img);
@@ -672,6 +709,8 @@ int main(int argc, char *argv[])
 
       fprintf(stderr, " Bitrate: %.3f Mbps\n",          bitrate_mbps);
       fprintf(stderr, " AVG QP: %.1f\n",                avg_qp);
+
+      fprintf(stderr, " Average latency: %.2f ms Max latency: %li ms Min latency: %li ms\n", (double)((double)sum_frame_times / (double)frames_done), max_frame_time, min_frame_time);
     }
     pthread_join(input_thread, NULL);
   }

@@ -574,7 +574,7 @@ void print_help(void)
     "                                   - wpp: Put rows in dependent slices.\n"
     "                                   - tiles+wpp: Do both.\n"
     "      --partial-coding <x-offset>!<y-offset>!<slice-width>!<slice-height>\n"
-    "                             : Encode partial frame.\n" 
+    "                             : Encode partial frame.\n"
     "                               Parts must be merged to form a valid bitstream.\n"
     "                               X and Y are CTU offsets.\n"
     "                               Slice width and height must be divisible by CTU\n"
@@ -614,7 +614,8 @@ void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
                       const bool print_psnr,
-                      const double avg_qp)
+                      const double avg_qp,
+                      const int64_t frame_time)
 {
   fprintf(stderr, "POC %4d QP %2d AVG QP %.1f (%c-frame) %10d bits",
           info->poc,
@@ -627,6 +628,8 @@ void print_frame_info(const kvz_frame_info *const info,
     fprintf(stderr, " PSNR Y %2.4f U %2.4f V %2.4f",
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);
   }
+
+  fprintf(stderr, " %li ms", frame_time);
 
   if (info->slice_type != KVZ_SLICE_I) {
     // Print reference picture lists
