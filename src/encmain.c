@@ -710,7 +710,15 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Bitrate: %.3f Mbps\n",          bitrate_mbps);
       fprintf(stderr, " AVG QP: %.1f\n",                avg_qp);
 
+#ifdef _WIN32
       fprintf(stderr, " Average latency: %.2f ms Max latency: %li ms Min latency: %li ms\n", (double)((double)sum_frame_times / (double)frames_done), max_frame_time, min_frame_time);
+#else
+      fprintf(stderr, " Average latency: %.2f ms Max latency: %.2f ms Min latency: %.2f ms\n",
+        (double)((double)sum_frame_times / (double)frames_done),
+        (double)max_frame_time / 1e6,
+        (double)min_frame_time / 1e6
+      );
+#endif //_WIN32
     }
     pthread_join(input_thread, NULL);
   }

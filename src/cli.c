@@ -629,7 +629,11 @@ void print_frame_info(const kvz_frame_info *const info,
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);
   }
 
+#if _WIN32
   fprintf(stderr, " %li ms", frame_time);
+#else
+  fprintf(stderr, " %.2f ms", (double)frame_time / 1e6);
+#endif //_WIN32
 
   if (info->slice_type != KVZ_SLICE_I) {
     // Print reference picture lists
